@@ -1,5 +1,9 @@
 # strands-lambda-durable
 
+[![CI](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml/badge.svg)](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml)
+
+English | [日本語](./README.ja.md)
+
 Run [Strands Agents](https://strandsagents.com) (TypeScript) on [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html). Each model request and each tool use becomes its own durable step. If a Lambda invocation stops, the next one replays completed steps from the journal instead of calling the model or the tool again. The Strands agent loop stays as it is: the package wraps Strands' public `Model` and `Tool` extension points and adds a tool executor.
 
 > Status: pre-1.0. The API may change between minor versions. Supported: `@strands-agents/sdk` >= 1.18 < 2, `@aws/durable-execution-sdk-js` >= 2.4 < 3, Node.js 22+.
@@ -80,10 +84,14 @@ The approver answers with `aws lambda send-durable-execution-callback-success --
 - **Quotas.** Lambda allows 3,000 operations and 100 MB of checkpoint data per execution. Use `createOffloadSerdes` for large tool results. Split very long conversations into several executions, for example one execution per user message, with history kept in your own store.
 - **Versions.** Invoke a published version or alias, so that a running execution keeps the code that matches its journal.
 
+## Example
+
+[strands-lambda-durable-ts](https://github.com/har1101/strands-lambda-durable-ts) is a deployable chat app built on this package (AWS SAM, Cognito, CloudFront, AppSync Events). It shows parallel tools, approval with durable callbacks, live streaming, and conversation history.
+
 ## Testing your agent
 
-The durable SDK's `LocalDurableTestRunner` runs a handler locally. It supports suspension, callbacks, and retries. See this package's `test/` directory for a provider-independent scripted model and the scenarios covered: replay, retries, interrupts, parallel tools, MCP, offloading, and `modelState`. If a test depends on the invocation ending, use real timers (`skipTime: false`). The SDK ends an idle invocation after a 20 ms cooldown, and with skipped time a short wait can finish before that happens.
+The durable SDK's `LocalDurableTestRunner` runs a handler locally. It supports suspension, callbacks, and retries. See this repository's `test/` directory for a provider-independent scripted model and the scenarios covered: replay, retries, interrupts, parallel tools, MCP, offloading, and `modelState`. If a test depends on the invocation ending, use real timers (`skipTime: false`). The SDK ends an idle invocation after a 20 ms cooldown, and with skipped time a short wait can finish before that happens.
 
 ## License
 
-MIT
+MIT. See [LICENSE](./LICENSE). Contributions: see [CONTRIBUTING.md](./CONTRIBUTING.md).
