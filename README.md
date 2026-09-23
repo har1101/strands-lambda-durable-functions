@@ -1,25 +1,27 @@
-# strands-lambda-durable
+# strands-lambda-durable-functions
 
-[![CI](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml/badge.svg)](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml)
+[![CI](https://github.com/har1101/strands-lambda-durable-functions/actions/workflows/ci.yml/badge.svg)](https://github.com/har1101/strands-lambda-durable-functions/actions/workflows/ci.yml)
 
 English | [日本語](./README.ja.md)
 
-Run [Strands Agents](https://strandsagents.com) (TypeScript) on [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html). Each model request and each tool use becomes its own durable step. If a Lambda invocation stops, the next one replays completed steps from the journal instead of calling the model or the tool again. The Strands agent loop stays as it is: the package wraps Strands' public `Model` and `Tool` extension points and adds a tool executor.
+A **community extension for [Strands Agents](https://strandsagents.com) (TypeScript)** that runs agents on [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html). Each model request and each tool use becomes its own durable step. If a Lambda invocation stops, the next one replays completed steps from the journal instead of calling the model or the tool again.
+
+This is an add-on, not a fork, and it is not an official Strands or AWS package. You keep using `@strands-agents/sdk` and its agent loop as they are. The package wraps Strands' public `Model` and `Tool` extension points and adds a tool executor. Strands and the durable execution SDK are peer dependencies.
 
 > Status: pre-1.0. The API may change between minor versions. Supported: `@strands-agents/sdk` >= 1.18 < 2, `@aws/durable-execution-sdk-js` >= 2.4 < 3, Node.js 22+.
 
 ## Install
 
 ```bash
-npm install strands-lambda-durable @strands-agents/sdk @aws/durable-execution-sdk-js zod
+npm install strands-lambda-durable-functions @strands-agents/sdk @aws/durable-execution-sdk-js zod
 # for S3 offloading of large checkpoints
 npm install @aws-sdk/client-s3
 ```
 
-Until the package is published to npm, install the tarball from the [GitHub release](https://github.com/har1101/strands-lambda-durable/releases) instead:
+Until the package is published to npm, install the tarball from the [GitHub release](https://github.com/har1101/strands-lambda-durable-functions/releases) instead:
 
 ```bash
-npm install https://github.com/har1101/strands-lambda-durable/releases/download/v0.1.1/strands-lambda-durable-0.1.1.tgz
+npm install https://github.com/har1101/strands-lambda-durable-functions/releases/download/v0.2.0/strands-lambda-durable-functions-0.2.0.tgz
 ```
 
 ## Quick start
@@ -30,7 +32,7 @@ import { Agent, BedrockModel, tool } from "@strands-agents/sdk";
 import { z } from "zod";
 import {
   DurableModel, DurableTool, DurableToolExecutor, currentToolExecution, invokeDurably,
-} from "strands-lambda-durable";
+} from "strands-lambda-durable-functions";
 
 export const handler = withDurableExecution(async (event: { prompt: string }, context) => {
   // Build a fresh agent on every invocation; the durable journal, not memory, carries progress.
@@ -76,7 +78,7 @@ The approver answers with `aws lambda send-durable-execution-callback-success --
 | `durableWorkflowTool(context, config)` | A tool whose body runs in a child context and may use any durable operation: waits, callbacks, invokes, or a sub-agent built with `DurableModel` over the child context. |
 | `durableMcpTools(context, mcpClient, { id })` | Lists an MCP server's tools once per execution (`mcp-tools-<id>` step) and wraps them in `DurableTool`. Later invocations of that execution keep the recorded list; new executions see the current one. |
 | `createOffloadSerdes({ store, thresholdBytes?, prefix? })` | JSON serdes that stores checkpoint payloads above the threshold (default 64 KiB) in an `OffloadStore` and keeps a pointer in the journal. Pass it as `serdes` to the model, the tools, and the executor. |
-| `s3OffloadStore({ client, bucket, prefix? })` (from `strands-lambda-durable/s3`) | `OffloadStore` on Amazon S3. Give the bucket a lifecycle rule longer than the durable retention period. |
+| `s3OffloadStore({ client, bucket, prefix? })` (from `strands-lambda-durable-functions/s3`) | `OffloadStore` on Amazon S3. Give the bucket a lifecycle rule longer than the durable retention period. |
 | `currentToolExecution()` | Inside a durable tool: `{ idempotencyKey, attempt }`. The key is `<execution ARN>#<toolUseId>`. |
 | `modelRetryStrategy`, `toolRetryStrategy`, `RetryableToolError` | Default retry policies and the retry signal. |
 | `EventSink`, `DurableLiveEvent` | Receives provisional live events. A new `attempt` on `model_start` replaces that call's earlier text. |

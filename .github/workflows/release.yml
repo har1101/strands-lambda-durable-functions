@@ -31,11 +31,11 @@ jobs:
       - run: npm test
       - run: npm pack # prepack builds dist/
       - name: Create GitHub release
-        run: gh release create "${GITHUB_REF_NAME}" strands-lambda-durable-*.tgz --title "${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" strands-lambda-durable-functions-*.tgz --title "${GITHUB_REF_NAME}" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Publish to npm
         if: env.NPM_TOKEN != ''
-        run: npm publish strands-lambda-durable-*.tgz --provenance --access public
+        run: npm publish strands-lambda-durable-functions-*.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

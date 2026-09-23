@@ -1,25 +1,27 @@
-# strands-lambda-durable
+# strands-lambda-durable-functions
 
-[![CI](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml/badge.svg)](https://github.com/har1101/strands-lambda-durable/actions/workflows/ci.yml)
+[![CI](https://github.com/har1101/strands-lambda-durable-functions/actions/workflows/ci.yml/badge.svg)](https://github.com/har1101/strands-lambda-durable-functions/actions/workflows/ci.yml)
 
 [English](./README.md) | 日本語
 
-[Strands Agents](https://strandsagents.com)（TypeScript）を [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html) 上で動かすためのパッケージです。モデルへのリクエストとツールの実行は、1 回ごとに独立した durable step になります。Lambda の呼び出しが途中で止まっても、次の呼び出しは完了済みのステップをジャーナルからリプレイします。モデルやツールを呼び直すことはありません。Strands のエージェントループはそのまま使います。このパッケージは Strands の公開拡張ポイントである `Model` と `Tool` をラップし、ツールエグゼキューターを 1 つ追加します。
+[Strands Agents](https://strandsagents.com)（TypeScript）の**コミュニティ製の拡張機能**です。エージェントを [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html) 上で動かせるようにします。モデルへのリクエストとツールの実行は、1 回ごとに独立した durable step になります。Lambda の呼び出しが途中で止まっても、次の呼び出しは完了済みのステップをジャーナルからリプレイし、モデルやツールを呼び直しません。
+
+Strands のフォークではなく追加モジュールです。Strands と AWS の公式パッケージでもありません。`@strands-agents/sdk` とそのエージェントループはそのまま使います。このパッケージは、Strands の公開拡張ポイントである `Model` と `Tool` をラップし、ツールエグゼキューターを 1 つ追加します。Strands と durable execution SDK は peer dependency です。
 
 > ステータス: 1.0 より前のバージョンです。マイナーバージョン間で API が変わることがあります。対応バージョン: `@strands-agents/sdk` >= 1.18 < 2、`@aws/durable-execution-sdk-js` >= 2.4 < 3、Node.js 22 以上。
 
 ## インストール
 
 ```bash
-npm install strands-lambda-durable @strands-agents/sdk @aws/durable-execution-sdk-js zod
+npm install strands-lambda-durable-functions @strands-agents/sdk @aws/durable-execution-sdk-js zod
 # 大きなチェックポイントを S3 に退避する場合
 npm install @aws-sdk/client-s3
 ```
 
-npm への公開が完了するまでは、[GitHub リリース](https://github.com/har1101/strands-lambda-durable/releases)の tarball からインストールしてください。
+npm への公開が完了するまでは、[GitHub リリース](https://github.com/har1101/strands-lambda-durable-functions/releases)の tarball からインストールしてください。
 
 ```bash
-npm install https://github.com/har1101/strands-lambda-durable/releases/download/v0.1.1/strands-lambda-durable-0.1.1.tgz
+npm install https://github.com/har1101/strands-lambda-durable-functions/releases/download/v0.2.0/strands-lambda-durable-functions-0.2.0.tgz
 ```
 
 ## クイックスタート
@@ -30,7 +32,7 @@ import { Agent, BedrockModel, tool } from "@strands-agents/sdk";
 import { z } from "zod";
 import {
   DurableModel, DurableTool, DurableToolExecutor, currentToolExecution, invokeDurably,
-} from "strands-lambda-durable";
+} from "strands-lambda-durable-functions";
 
 export const handler = withDurableExecution(async (event: { prompt: string }, context) => {
   // エージェントは呼び出しごとに作り直します。進捗を保持するのはメモリではなく durable ジャーナルです。
@@ -76,7 +78,7 @@ export const handler = withDurableExecution(async (event: { prompt: string }, co
 | `durableWorkflowTool(context, config)` | 本体を子コンテキストで実行するツールです。待機、コールバック、invoke、または子コンテキスト上の `DurableModel` で作ったサブエージェントなど、任意の durable オペレーションを使えます。 |
 | `durableMcpTools(context, mcpClient, { id })` | MCP サーバーのツール一覧を実行ごとに 1 回だけ取得し（`mcp-tools-<id>` ステップ）、`DurableTool` でラップします。同じ実行の後続の呼び出しは記録済みの一覧を使います。新しい実行では最新の一覧を取得します。 |
 | `createOffloadSerdes({ store, thresholdBytes?, prefix? })` | しきい値（既定値 64 KiB）を超えるチェックポイントのペイロードを `OffloadStore` に保存し、ジャーナルにはポインターだけを残す JSON serdes です。モデル、ツール、エグゼキューターの `serdes` に渡します。 |
-| `s3OffloadStore({ client, bucket, prefix? })`（`strands-lambda-durable/s3` から） | Amazon S3 を使う `OffloadStore` です。バケットには、durable の保持期間より長いライフサイクルルールを設定してください。 |
+| `s3OffloadStore({ client, bucket, prefix? })`（`strands-lambda-durable-functions/s3` から） | Amazon S3 を使う `OffloadStore` です。バケットには、durable の保持期間より長いライフサイクルルールを設定してください。 |
 | `currentToolExecution()` | durable ツールの中で `{ idempotencyKey, attempt }` を返します。キーは `<実行 ARN>#<toolUseId>` です。 |
 | `modelRetryStrategy`、`toolRetryStrategy`、`RetryableToolError` | 既定のリトライポリシーと、リトライを要求するためのエラーです。 |
 | `EventSink`、`DurableLiveEvent` | 暫定のライブイベントを受け取ります。`model_start` の `attempt` が新しくなったら、その呼び出しで以前に送ったテキストは置き換えます。 |

@@ -1,23 +1,24 @@
 {
-  "name": "strands-lambda-durable",
-  "version": "0.1.1",
-  "description": "Run Strands Agents (TypeScript) on AWS Lambda durable functions: one durable step per model call and tool use, human-in-the-loop via durable callbacks.",
+  "name": "strands-lambda-durable-functions",
+  "version": "0.2.0",
+  "description": "A Strands Agents (TypeScript) extension for AWS Lambda durable functions: one durable step per model call and tool use, parallel tools with a deterministic journal, and human-in-the-loop via durable callbacks.",
   "keywords": [
     "strands-agents",
     "aws-lambda",
     "durable-functions",
     "durable-execution",
-    "ai-agents"
+    "ai-agents",
+    "strands-extension"
   ],
   "license": "MIT",
   "author": "har1101",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/har1101/strands-lambda-durable.git"
+    "url": "git+https://github.com/har1101/strands-lambda-durable-functions.git"
   },
-  "homepage": "https://github.com/har1101/strands-lambda-durable#readme",
+  "homepage": "https://github.com/har1101/strands-lambda-durable-functions#readme",
   "bugs": {
-    "url": "https://github.com/har1101/strands-lambda-durable/issues"
+    "url": "https://github.com/har1101/strands-lambda-durable-functions/issues"
   },
   "type": "module",
   "sideEffects": false,
