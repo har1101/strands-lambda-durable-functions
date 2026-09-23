@@ -1,7 +1,7 @@
 {
   "name": "strands-lambda-durable-functions",
   "version": "0.2.0",
-  "description": "A Strands Agents (TypeScript) extension for AWS Lambda durable functions: one durable step per model call and tool use, parallel tools with a deterministic journal, and human-in-the-loop via durable callbacks.",
+  "description": "Unofficial Strands Agents (TypeScript) extension for AWS Lambda durable functions: one durable step per model call and tool use, parallel tools with a deterministic journal, and human-in-the-loop via durable callbacks.",
   "keywords": [
     "strands-agents",
     "aws-lambda",

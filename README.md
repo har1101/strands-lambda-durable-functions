@@ -4,9 +4,9 @@
 
 English | [日本語](./README.ja.md)
 
-A **community extension for [Strands Agents](https://strandsagents.com) (TypeScript)** that runs agents on [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html). Each model request and each tool use becomes its own durable step. If a Lambda invocation stops, the next one replays completed steps from the journal instead of calling the model or the tool again.
+An **unofficial community extension for [Strands Agents](https://strandsagents.com) (TypeScript)** that runs agents on [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html). Each model request and each tool use becomes its own durable step. If a Lambda invocation stops, the next one replays completed steps from the journal instead of calling the model or the tool again.
 
-This is an add-on, not a fork, and it is not an official Strands or AWS package. You keep using `@strands-agents/sdk` and its agent loop as they are. The package wraps Strands' public `Model` and `Tool` extension points and adds a tool executor. Strands and the durable execution SDK are peer dependencies.
+> **Unofficial.** This project is not affiliated with, endorsed by, or supported by the Strands Agents project or Amazon Web Services. It is an add-on, not a fork: you keep using `@strands-agents/sdk` and its agent loop as they are. The package wraps Strands' public `Model` and `Tool` extension points and adds a tool executor. Strands and the durable execution SDK are peer dependencies.
 
 > Status: pre-1.0. The API may change between minor versions. Supported: `@strands-agents/sdk` >= 1.18 < 2, `@aws/durable-execution-sdk-js` >= 2.4 < 3, Node.js 22+.
 

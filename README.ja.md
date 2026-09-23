@@ -4,9 +4,9 @@
 
 [English](./README.md) | 日本語
 
-[Strands Agents](https://strandsagents.com)（TypeScript）の**コミュニティ製の拡張機能**です。エージェントを [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html) 上で動かせるようにします。モデルへのリクエストとツールの実行は、1 回ごとに独立した durable step になります。Lambda の呼び出しが途中で止まっても、次の呼び出しは完了済みのステップをジャーナルからリプレイし、モデルやツールを呼び直しません。
+[Strands Agents](https://strandsagents.com)（TypeScript）の**非公式のコミュニティ製拡張機能**です。エージェントを [AWS Lambda durable functions](https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html) 上で動かせるようにします。モデルへのリクエストとツールの実行は、1 回ごとに独立した durable step になります。Lambda の呼び出しが途中で止まっても、次の呼び出しは完了済みのステップをジャーナルからリプレイし、モデルやツールを呼び直しません。
 
-Strands のフォークではなく追加モジュールです。Strands と AWS の公式パッケージでもありません。`@strands-agents/sdk` とそのエージェントループはそのまま使います。このパッケージは、Strands の公開拡張ポイントである `Model` と `Tool` をラップし、ツールエグゼキューターを 1 つ追加します。Strands と durable execution SDK は peer dependency です。
+> **非公式です。** このプロジェクトは、Strands Agents プロジェクトや Amazon Web Services とは提携しておらず、承認やサポートも受けていません。Strands のフォークではなく追加モジュールなので、`@strands-agents/sdk` とそのエージェントループはそのまま使います。このパッケージは、Strands の公開拡張ポイントである `Model` と `Tool` をラップし、ツールエグゼキューターを 1 つ追加します。Strands と durable execution SDK は peer dependency です。
 
 > ステータス: 1.0 より前のバージョンです。マイナーバージョン間で API が変わることがあります。対応バージョン: `@strands-agents/sdk` >= 1.18 < 2、`@aws/durable-execution-sdk-js` >= 2.4 < 3、Node.js 22 以上。
 

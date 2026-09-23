@@ -3,7 +3,7 @@
 ## 0.2.0 (2026-09-24)
 
 - Renamed the package and repository from `strands-lambda-durable` to `strands-lambda-durable-functions`, so the name says which AWS service it integrates with. Update imports (`strands-lambda-durable-functions`, `strands-lambda-durable-functions/s3`). No API or checkpoint format changes.
-- README states that this is a community extension for Strands Agents, not a fork or an official package.
+- README states that this is an unofficial community extension for Strands Agents, not a fork, and not affiliated with the Strands Agents project or AWS.
 
 ## 0.1.1 (2026-09-23)
 
