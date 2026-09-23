@@ -22,4 +22,4 @@ Guidelines:
 ## Releasing
 
 1. Update `version` in `package.json` and `CHANGELOG.md`.
-2. Tag the commit `v<version>` and push the tag. The Release workflow publishes to npm with provenance; it requires the `NPM_TOKEN` secret.
+2. Tag the commit `v<version>` and push the tag. The Release workflow attaches the packed tarball to a GitHub release and, when the `NPM_TOKEN` secret is set, publishes it to npm with provenance.

@@ -1,17 +1,20 @@
 name: Release
 
-# Publishes to npm when a version tag (v1.2.3) is pushed. Requires the NPM_TOKEN repository secret.
+# On a version tag (v1.2.3): test, pack, attach the tarball to a GitHub release, and publish to npm when the
+# NPM_TOKEN repository secret is set.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write # create the GitHub release
   id-token: write # npm provenance
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +29,13 @@ jobs:
         run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
       - run: npm run typecheck
       - run: npm test
-      - run: npm publish --provenance --access public
+      - run: npm pack # prepack builds dist/
+      - name: Create GitHub release
+        run: gh release create "${GITHUB_REF_NAME}" strands-lambda-durable-*.tgz --title "${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish to npm
+        if: env.NPM_TOKEN != ''
+        run: npm publish strands-lambda-durable-*.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

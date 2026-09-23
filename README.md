@@ -16,6 +16,12 @@ npm install strands-lambda-durable @strands-agents/sdk @aws/durable-execution-sd
 npm install @aws-sdk/client-s3
 ```
 
+Until the package is published to npm, install the tarball from the [GitHub release](https://github.com/har1101/strands-lambda-durable/releases) instead:
+
+```bash
+npm install https://github.com/har1101/strands-lambda-durable/releases/download/v0.1.0/strands-lambda-durable-0.1.0.tgz
+```
+
 ## Quick start
 
 ```ts
