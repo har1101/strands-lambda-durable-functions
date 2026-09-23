@@ -1,6 +1,6 @@
 {
   "name": "strands-lambda-durable",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run Strands Agents (TypeScript) on AWS Lambda durable functions: one durable step per model call and tool use, human-in-the-loop via durable callbacks.",
   "keywords": [
     "strands-agents",

@@ -19,7 +19,7 @@ npm install @aws-sdk/client-s3
 npm への公開が完了するまでは、[GitHub リリース](https://github.com/har1101/strands-lambda-durable/releases)の tarball からインストールしてください。
 
 ```bash
-npm install https://github.com/har1101/strands-lambda-durable/releases/download/v0.1.0/strands-lambda-durable-0.1.0.tgz
+npm install https://github.com/har1101/strands-lambda-durable/releases/download/v0.1.1/strands-lambda-durable-0.1.1.tgz
 ```
 
 ## クイックスタート
@@ -83,7 +83,7 @@ export const handler = withDurableExecution(async (event: { prompt: string }, co
 
 ## 保証と制約
 
-- **リプレイされるもの。** 完了したモデル呼び出しとツール実行は、再実行せずにジャーナルからリプレイします。エラー結果、割り込み、`appState` の変更、`modelState` も含みます。バイナリ（`Uint8Array`）もそのまま保持します。各ツール実行は、自分が設定または削除した `appState` のキーだけを記録します。このため、並列に動くツールが互いの変更を上書きすることはありません。並列のツールが同じキーに書き込んだ場合、最終的な値は完了順に依存します。キーは分けてください。チェックポイントにはバージョンがあります。現在は `schemaVersion` 3 で、バージョン 1 と 2 も読み込めます。
+- **リプレイされるもの。** 完了したモデル呼び出しとツール実行は、再実行せずにジャーナルからリプレイします。エラー結果、割り込み、`appState` の変更、`modelState` も含みます。バイナリ（`Uint8Array`）もそのまま保持します。各ツール実行は、自分が設定または削除した `appState` のキーだけを記録します。このため、並列に動くツールが互いの変更を上書きすることはありません。並列のツールが同じキーに書き込んだ場合、最終的な値は完了順に依存します。キーは分けてください。恒久的に失敗したツール実行と、割り込みを発生させたツール実行の `appState` の変更は残りません。チェックポイントにはバージョンがあります。現在は `schemaVersion` 3 で、バージョン 1 と 2 も読み込めます。
 - **exactly-once ではありません。** 副作用の後、チェックポイントの前にプロセスが止まると、そのステップは再実行されることがあります。`idempotencyKey` で重複を排除できる API に渡してください。
 - **決定性は利用者の責任です。** エージェントは毎回同じ方法で組み立ててください。durable でない処理（I/O を伴うフック、時計、乱数）を判断に使わないでください。使う場合は durable ツールに移してください。ラップしていないツールはリプレイのたびに再実行されます。
 - **ライブイベントは暫定です。** ライブイベントは実行中のステップの副作用です。リトライでは新しい `attempt` のイベントが送られます。正しい状態はジャーナル（またはステップ内で書き込む独自のストア）で判断してください。

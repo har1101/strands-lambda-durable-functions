@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 (2026-09-23)
+
+- `DurableTool`: a tool use whose step fails permanently or raises an interrupt now undoes its live `appState` changes. The journal keeps no changes for such a step, so live state and replayed state now match.
+
 ## 0.1.0 (2026-09-23)
 
 First release.
