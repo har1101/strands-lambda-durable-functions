@@ -4,12 +4,13 @@ import {
   Model,
   type BaseModelConfig, type JSONValue, type Message, type ModelStreamEvent, type StreamOptions,
 } from "@strands-agents/sdk";
-import { checked, decode, encode, SCHEMA_VERSION } from "./codec.js";
+import { checked, decode, encode, SCHEMA_VERSION, type SchemaVersion } from "./codec.js";
 import type { EventSink } from "./events.js";
 import { modelRetryStrategy, type RetryStrategy } from "./retry.js";
+import { toolUseOccurrences } from "./scope.js";
 
 type ModelRecord = {
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: SchemaVersion;
   events: ModelStreamEvent[];
   /** `options.modelState` after the call, for stateful providers (for example a server-side conversation ID). */
   modelState?: Record<string, JSONValue>;
@@ -79,11 +80,25 @@ export class DurableModel extends Model<BaseModelConfig> {
       };
     }, { retryStrategy, ...(serdes && { serdes }) }));
 
+    const recorded = decode(record.events, record.schemaVersion);
+    // Strands keys interrupt state and resumed results by toolUseId, and so does the durable journal.
+    const toolUseIds = new Set<string>();
+    for (const event of recorded) {
+      if (event.type !== "modelContentBlockStartEvent" || event.start?.type !== "toolUseStart") continue;
+      if (toolUseIds.has(event.start.toolUseId)) {
+        throw new Error(`Model response ${call} repeats toolUseId ${JSON.stringify(event.start.toolUseId)}; tool uses in one response need distinct IDs`);
+      }
+      toolUseIds.add(event.start.toolUseId);
+    }
+    let occurrences = toolUseOccurrences.get(this.context);
+    if (!occurrences) toolUseOccurrences.set(this.context, occurrences = new Map());
+    for (const toolUseId of toolUseIds) occurrences.set(toolUseId, (occurrences.get(toolUseId) ?? 0) + 1);
+
     if (record.modelState && options?.modelState) {
       const state = options.modelState;
       state.clear();
-      for (const [key, value] of Object.entries(decode(record.modelState))) state.set(key, value);
+      for (const [key, value] of Object.entries(decode(record.modelState, record.schemaVersion))) state.set(key, value);
     }
-    for (const event of decode(record.events)) yield event;
+    for (const event of recorded) yield event;
   }
 }

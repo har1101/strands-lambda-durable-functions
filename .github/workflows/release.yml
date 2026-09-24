@@ -1,41 +1,88 @@
 name: Release
 
-# On a version tag (v1.2.3): test, pack, attach the tarball to a GitHub release, and publish to npm when the
-# NPM_TOKEN repository secret is set.
+# On a version tag (v1.2.3): test and pack the tarball, attach it to a GitHub release together with SHA256SUMS and a
+# build provenance attestation, then publish it to npm.
+#
+# Publishing uses npm trusted publishing (OIDC) when configured: set the repository variable
+# NPM_TRUSTED_PUBLISHING=true and register this workflow file with environment `npm` as a trusted publisher on
+# npmjs.com. Otherwise the NPM_TOKEN secret is used; with neither, the publish step is skipped.
+# Configure required reviewers on the `npm` environment so every publish needs manual approval.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write # create the GitHub release
-  id-token: write # npm provenance
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
-          cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Check tag matches package.json version
         run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
       - run: npm run typecheck
       - run: npm test
       - run: npm pack # prepack builds dist/
+      - run: sha256sum strands-lambda-durable-functions-*.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: package
+          path: |
+            strands-lambda-durable-functions-*.tgz
+            SHA256SUMS
+          if-no-files-found: error
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # sign the attestation
+      attestations: write # store the attestation
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: package
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: strands-lambda-durable-functions-*.tgz
       - name: Create GitHub release
-        run: gh release create "${GITHUB_REF_NAME}" strands-lambda-durable-functions-*.tgz --title "${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" strands-lambda-durable-functions-*.tgz SHA256SUMS --title "${GITHUB_REF_NAME}" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+  publish:
+    needs: [build, github-release]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24 # bundles npm >= 11.5.1, required for trusted publishing
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: package
       - name: Publish to npm
-        if: env.NPM_TOKEN != ''
-        run: npm publish strands-lambda-durable-functions-*.tgz --provenance --access public
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ] && [ "${NPM_TRUSTED_PUBLISHING}" != "true" ]; then
+            echo "::notice::Skipping npm publish: neither NPM_TOKEN nor NPM_TRUSTED_PUBLISHING=true is configured."
+            exit 0
+          fi
+          npm publish ./strands-lambda-durable-functions-*.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TRUSTED_PUBLISHING: ${{ vars.NPM_TRUSTED_PUBLISHING }}

@@ -10,7 +10,9 @@ export type DurableLiveEvent =
       tool: string;
       toolUseId: string;
       status: "progress" | "success" | "error" | "interrupted";
+      /** Only with `eventDetails: true`: the result block (`success`/`error`) or the interrupt reason. */
       result?: unknown;
+      /** Only with `eventDetails: true`: the progress data as JSON. */
       text?: string;
     };
 

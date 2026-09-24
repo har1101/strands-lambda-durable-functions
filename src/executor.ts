@@ -25,9 +25,13 @@ export class DurableToolExecutor extends ConcurrentToolExecutor {
   }
 
   override async *execute(...[options, input]: ExecuteArgs): ReturnType<ConcurrentToolExecutor["execute"]> {
-    const pending = input.toolUseBlocks
-      .map(block => block.toolUseId)
-      .filter(toolUseId => !input.completedToolResults?.has(toolUseId));
+    const toolUseIds = input.toolUseBlocks.map(block => block.toolUseId);
+    const duplicate = toolUseIds.find((toolUseId, index) => toolUseIds.indexOf(toolUseId) !== index);
+    if (duplicate !== undefined) {
+      // Slots are claimed by toolUseId; a repeated ID would hand one tool use's recorded result to the other.
+      throw new Error(`A model turn repeats toolUseId ${JSON.stringify(duplicate)}; tool uses in one turn need distinct IDs`);
+    }
+    const pending = toolUseIds.filter(toolUseId => !input.completedToolResults?.has(toolUseId));
     const coordinator = new TurnCoordinator(this.context, ++this.turns, pending, this.options.serdes);
     coordinators.set(options.agent, coordinator);
     try {

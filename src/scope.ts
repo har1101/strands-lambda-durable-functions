@@ -1,14 +1,36 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 import type { DurableContext, Serdes } from "@aws/durable-execution-sdk-js";
 
 export type DurableToolExecution = {
-  /** Same value on every retry and replay of this tool use, and after an interrupt is resumed. */
+  /**
+   * Same value on every retry and replay of this tool use, and after an interrupt is resumed. Distinct for every
+   * tool use of the execution, even if the model provider reuses a `toolUseId`. A SHA-256 hex digest, so the
+   * execution ARN is not passed on to the APIs that receive it.
+   */
   idempotencyKey: string;
   /** Step attempt, starting at 1. */
   attempt: number;
 };
 
 export const toolScope = new AsyncLocalStorage<DurableToolExecution>();
+
+/** Key of the durable workflow tool use whose body is running; nested agents' tool uses are scoped under it. */
+export const enclosingToolUse = new AsyncLocalStorage<string>();
+
+/**
+ * Per durable context: how many recorded model responses issued each `toolUseId`. `DurableModel` counts, tools read.
+ * A resumed interrupt re-runs a tool use without a new model response, so it keeps its count and its key.
+ */
+export const toolUseOccurrences = new WeakMap<DurableContext, Map<string, number>>();
+
+/** Idempotency key of the current use of `toolUseId` by the agent built over `context`. */
+export function toolUseKey(context: DurableContext, toolUseId: string): string {
+  const occurrence = toolUseOccurrences.get(context)?.get(toolUseId) ?? 0;
+  return createHash("sha256")
+    .update([context.executionContext.durableExecutionArn, enclosingToolUse.getStore() ?? "", toolUseId, occurrence].join("\0"))
+    .digest("hex");
+}
 
 /** Returns the current durable tool execution. Call it from a tool callback wrapped by `DurableTool`. */
 export function currentToolExecution(): DurableToolExecution {

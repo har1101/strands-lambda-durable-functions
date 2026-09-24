@@ -1,7 +1,7 @@
 import type { DurableContext } from "@aws/durable-execution-sdk-js";
 import { tool, type JSONValue } from "@strands-agents/sdk";
 import type { z } from "zod";
-import { coordinators } from "./scope.js";
+import { coordinators, enclosingToolUse, toolUseKey } from "./scope.js";
 
 export type DurableWorkflowToolConfig<S extends z.ZodType> = {
   name: string;
@@ -23,11 +23,13 @@ export function durableWorkflowTool<S extends z.ZodType>(context: DurableContext
     // DurablePromise is a lazy thenable, not a Promise; FunctionTool would serialize it unless awaited here.
     callback: async (input, toolContext) => {
       const toolUseId = toolContext!.toolUse.toolUseId;
+      // Tool uses of agents inside `run` are keyed under this tool use, so their idempotency keys stay distinct
+      // even if their model reuses toolUseIds that this agent's model also issued.
+      const key = toolUseKey(context, toolUseId);
+      const run = (child: DurableContext) => enclosingToolUse.run(key, () => config.run(input, child, { toolUseId }));
       const coordinator = coordinators.get(toolContext!.agent);
-      if (coordinator) {
-        return await coordinator.claim(toolUseId, child => config.run(input, child, { toolUseId })) as JSONValue;
-      }
-      return await context.runInChildContext(`workflow-${config.name}-${toolUseId}`, child => config.run(input, child, { toolUseId }));
+      if (coordinator) return await coordinator.claim(toolUseId, run) as JSONValue;
+      return await context.runInChildContext(`workflow-${config.name}-${toolUseId}`, run);
     },
   });
 }

@@ -4,15 +4,18 @@ import {
   TextBlock, Tool, ToolResultBlock,
   type JSONValue, type ToolContext, type ToolResultBlockData, type ToolStreamGenerator,
 } from "@strands-agents/sdk";
-import { checked, decode, encode, SCHEMA_VERSION } from "./codec.js";
+import { checked, decode, encode, SCHEMA_VERSION, type SchemaVersion } from "./codec.js";
 import type { EventSink } from "./events.js";
 import { RetryableToolError, toolRetryStrategy, type RetryStrategy } from "./retry.js";
-import { coordinators, toolScope } from "./scope.js";
+import { coordinators, toolScope, toolUseKey } from "./scope.js";
 
 type InterruptRecord = { name: string; reason?: JSONValue };
 
 type ToolRecord = {
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: SchemaVersion;
+  /** Since v4: the tool use this record belongs to. Replay rejects a record claimed by a different tool use. */
+  toolUseId?: string;
+  tool?: string;
   result?: { toolResult: ToolResultBlockData };
   error?: { name: string; message: string };
   /** The tool raised a Strands interrupt; replay raises the same interrupt again. */
@@ -27,6 +30,12 @@ type ToolRecord = {
 export type DurableToolOptions = {
   /** Receives provisional `tool` events (progress, final status, interrupts). */
   events?: EventSink;
+  /**
+   * Include tool output in `tool` events: the result block, progress data, and the interrupt reason. Default false:
+   * events carry only the tool name, `toolUseId`, and status. Enable it only if the sink's consumers may see
+   * everything the tool returns to the model.
+   */
+  eventDetails?: boolean;
   /** Step retry policy. Default {@link toolRetryStrategy}, which retries only {@link RetryableToolError}. */
   retryStrategy?: RetryStrategy;
   /** Checkpoint serialization, for example `createOffloadSerdes` for large tool results. */
@@ -137,20 +146,27 @@ export class DurableTool extends Tool {
   async *stream(toolContext: ToolContext): ToolStreamGenerator {
     const call = ++this.calls;
     const toolUseId = toolContext.toolUse.toolUseId;
+    const idempotencyKey = toolUseKey(this.context, toolUseId);
     const coordinator = coordinators.get(toolContext.agent);
     let record: ToolRecord;
     if (coordinator) {
-      record = checked(await coordinator.claim(toolUseId, child => this.runStep(child, `tool-${this.name}-${toolUseId}`, toolContext)) as ToolRecord);
+      record = checked(await coordinator.claim(toolUseId, child => this.runStep(child, `tool-${this.name}-${toolUseId}`, toolContext, idempotencyKey)) as ToolRecord);
     } else {
       if (toolInFlight.has(this.context)) {
         throw new Error("DurableTool steps cannot overlap; use DurableToolExecutor or toolExecutor: 'sequential'");
       }
       toolInFlight.add(this.context);
       try {
-        record = checked(await this.runStep(this.context, `tool-${this.name}-${call}-${toolUseId}`, toolContext));
+        record = checked(await this.runStep(this.context, `tool-${this.name}-${call}-${toolUseId}`, toolContext, idempotencyKey));
       } finally {
         toolInFlight.delete(this.context);
       }
+    }
+    if ((record.toolUseId !== undefined && record.toolUseId !== toolUseId) || (record.tool !== undefined && record.tool !== this.name)) {
+      throw new Error(
+        `Journal mismatch: tool use ${toolUseId} (${this.name}) replayed the record of ${record.toolUseId} (${record.tool}). `
+        + "Build the agent the same way on every invocation.",
+      );
     }
 
     if (record.failure) {
@@ -171,15 +187,15 @@ export class DurableTool extends Tool {
         if (record.appState) {
           // Older checkpoints stored a complete snapshot, including deletions.
           state.clear();
-          for (const [key, value] of Object.entries(decode(record.appState))) state.set(key, value);
+          for (const [key, value] of Object.entries(decode(record.appState, record.schemaVersion))) state.set(key, value);
         }
         if (record.appStateDelta) {
           for (const key of record.appStateDelta.delete) state.delete(key);
-          for (const [key, value] of Object.entries(decode(record.appStateDelta.set))) state.set(key, value);
+          for (const [key, value] of Object.entries(decode(record.appStateDelta.set, record.schemaVersion))) state.set(key, value);
         }
       });
     }
-    const result = ToolResultBlock.fromJSON(decode(record.result!));
+    const result = ToolResultBlock.fromJSON(decode(record.result!, record.schemaVersion));
     if (record.error) {
       const error = new Error(record.error.message);
       error.name = record.error.name;
@@ -189,10 +205,10 @@ export class DurableTool extends Tool {
   }
 
   /** Runs the tool in one durable step of `context`. A permanent step failure becomes a `failure` record. */
-  private async runStep(context: DurableContext, name: string, toolContext: ToolContext): Promise<ToolRecord> {
-    const { events, retryStrategy = toolRetryStrategy, serdes } = this.options;
+  private async runStep(context: DurableContext, name: string, toolContext: ToolContext, idempotencyKey: string): Promise<ToolRecord> {
+    const { events, eventDetails, retryStrategy = toolRetryStrategy, serdes } = this.options;
     const toolUseId = toolContext.toolUse.toolUseId;
-    const idempotencyKey = `${context.executionContext.durableExecutionArn}#${toolUseId}`;
+    const identity = { toolUseId, tool: this.name };
     const state = toolContext.agent.appState;
     // The SDK owns one shared StateStore per agent; retries share this accumulator so a successful
     // attempt still checkpoints mutations performed by earlier attempts of the same tool use.
@@ -205,14 +221,15 @@ export class DurableTool extends Tool {
         if ("interrupt" in outcome) {
           // The tool runs again when the interrupt is answered; until then its writes are not part of the journal.
           rollBack(state, changes);
-          return { schemaVersion: SCHEMA_VERSION, interrupt: outcome.interrupt };
+          return { schemaVersion: SCHEMA_VERSION, ...identity, interrupt: outcome.interrupt };
         }
         const block = outcome.block;
         if (block.error instanceof RetryableToolError) throw block.error;
         const result = encode(block.toJSON());
-        await events?.put({ kind: "tool", tool: this.name, toolUseId, status: block.status, result });
+        await events?.put({ kind: "tool", tool: this.name, toolUseId, status: block.status, ...(eventDetails && { result }) });
         return {
           schemaVersion: SCHEMA_VERSION,
+          ...identity,
           result,
           ...(block.error && { error: { name: block.error.name, message: block.error.message } }),
           ...((changes.delete.size || Object.keys(changes.set).length) && {
@@ -226,25 +243,27 @@ export class DurableTool extends Tool {
       // the live ones (on replay nothing was changed).
       if (!(error instanceof StepError)) throw error;
       rollBack(state, changes);
-      return { schemaVersion: SCHEMA_VERSION, failure: { name: error.name, message: error.message } };
+      return { schemaVersion: SCHEMA_VERSION, ...identity, failure: { name: error.name, message: error.message } };
     }
   }
 
   private async runSource(toolContext: ToolContext): Promise<{ block: ToolResultBlock } | { interrupt: InterruptRecord }> {
-    const { events } = this.options;
+    const { events, eventDetails } = this.options;
     const toolUseId = toolContext.toolUse.toolUseId;
     try {
       const iterator = this.source.stream(toolContext);
       let next = await iterator.next();
       while (!next.done) {
-        await events?.put({ kind: "tool", tool: this.name, toolUseId, status: "progress", text: JSON.stringify(next.value.data) });
+        await events?.put({
+          kind: "tool", tool: this.name, toolUseId, status: "progress", ...(eventDetails && { text: JSON.stringify(next.value.data) }),
+        });
         next = await iterator.next();
       }
       return { block: next.value };
     } catch (error) {
       if (!isInterruptError(error)) throw error;
       const [first] = error.interrupts;
-      await events?.put({ kind: "tool", tool: this.name, toolUseId, status: "interrupted", result: first.reason });
+      await events?.put({ kind: "tool", tool: this.name, toolUseId, status: "interrupted", ...(eventDetails && { result: first.reason }) });
       return { interrupt: { name: first.name, ...(first.reason !== undefined && { reason: first.reason }) } };
     }
   }

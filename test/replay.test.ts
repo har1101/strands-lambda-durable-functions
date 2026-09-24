@@ -55,7 +55,7 @@ test("RetryableToolError retries only the tool step and keeps one idempotency ke
   assert.equal(counter.tool, 2, "one failed attempt, one successful retry");
   assert.equal(counter.model, 2, "a tool retry does not repeat the model call");
   assert.equal(new Set(keys).size, 1);
-  assert.match(keys[0], /#tooluse-1$/);
+  assert.doesNotMatch(keys[0], /arn:/, "the key does not pass the execution ARN on to downstream APIs");
   assert.match(JSON.stringify(execution.getResult()!.toolResults), /"attempt":2/);
 });
 

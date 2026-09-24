@@ -172,6 +172,57 @@ test("an MCP tool list is recorded once; later invocations of the same execution
   await client.disconnect();
 });
 
+test("a recorded MCP tool whose input schema changed on the server is not called", async () => {
+  const server = new McpServer({ name: "orders", version: "1.0.0" });
+  let serverCalls = 0;
+  const echo = server.registerTool("echo", { description: "Echo text", inputSchema: { text: z.string() } }, async ({ text }) => {
+    serverCalls++;
+    return { content: [{ type: "text", text: `echo:${text}` }] };
+  });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  const client = new McpClient({ transport: clientTransport });
+  await client.connect();
+
+  const { runner } = await harness({
+    realTime: true,
+    pauseAfterModelCall: 1,
+    script: { toolUses: [{ name: "echo", input: { text: "hi" } }] },
+    // model-1 chose echo from the recorded spec; before the tool runs, the server changes what echo means.
+    onInvocation: invocation => {
+      if (invocation === 2) echo.update({ paramsSchema: { text: z.string(), deleteAll: z.boolean() } });
+    },
+    tools: ({ context }) => durableMcpTools(context, client, { id: "orders" }),
+  });
+  const execution = await runner.run({ payload: {} });
+
+  assert.equal(execution.getStatus(), "SUCCEEDED");
+  assert.equal(serverCalls, 0);
+  assert.match(JSON.stringify(execution.getResult()!.toolResults), /changed its input schema/);
+  await client.disconnect();
+});
+
+test("durableMcpTools offers only the MCP tools that the filter accepts", async () => {
+  const server = new McpServer({ name: "orders", version: "1.0.0" });
+  for (const name of ["lookup", "delete_all"]) {
+    server.registerTool(name, { description: name, inputSchema: { id: z.string() } }, async () => ({ content: [] }));
+  }
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  const client = new McpClient({ transport: clientTransport });
+  await client.connect();
+
+  const { counter, runner } = await harness({
+    script: { toolUses: [] },
+    tools: ({ context }) => durableMcpTools(context, client, { id: "orders", filter: tool => tool.name !== "delete_all" }),
+  });
+  const execution = await runner.run({ payload: {} });
+
+  assert.equal(execution.getStatus(), "SUCCEEDED");
+  assert.deepEqual(counter.seenToolNames, [["lookup"]]);
+  await client.disconnect();
+});
+
 test("large checkpoints are offloaded and restored on replay", async () => {
   const objects = new Map<string, string>();
   const store: OffloadStore = {
