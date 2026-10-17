@@ -93,7 +93,7 @@ The approval backend answers with `aws lambda send-durable-execution-callback-su
 - **Not exactly-once.** A step can run again if the process stops after its side effect and before its checkpoint. Pass `idempotencyKey` to an API that deduplicates on it.
 - **Determinism is your part.** Build the agent the same way on every invocation. Keep work that is not durable (hooks with I/O, clocks, random values) out of decisions, or move it into a durable tool. Tools that are not wrapped run again on every replay.
 - **Live events are provisional.** They are side effects of a running step. Retried attempts emit new events with a new `attempt`. Use the journal (or your own store written in a step) as the source of truth.
-- **Quotas.** Lambda allows 3,000 operations and 100 MB of checkpoint data per execution. Use `createOffloadSerdes` for large tool results. Split very long conversations into several executions, for example one execution per user message, with history kept in your own store.
+- **Quotas.** Lambda allows 30,000 operations and 100 MB of checkpoint data per execution, and 1 MB per operation's checkpoint or callback payload. Use `createOffloadSerdes` for tool results that may exceed 1 MB or would use up the 100 MB. Split very long conversations into several executions, for example one execution per user message, with history kept in your own store.
 - **Versions.** Invoke a published version or alias, so that a running execution keeps the code that matches its journal.
 
 ## Security
